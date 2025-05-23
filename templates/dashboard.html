@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Dashboard Speech Delay</title>
+  <!-- Chart.js & WordCloud2.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/wordcloud2.js/1.1.1/wordcloud2.min.js"></script>
+  <!-- Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* --- Reset & Base --- */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Inter", sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+      line-height: 1.5;
+      padding: 20px;
+    }
+
+    /* --- Container --- */
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      padding: 24px;
+    }
+
+    h1,
+    h2 {
+      text-align: center;
+      margin-bottom: 16px;
+      font-weight: 600;
+    }
+
+    /* --- Form Filter --- */
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    form label {
+      background: #f1f1f1;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 14px;
+    }
+
+    form label:hover {
+      background: #f78ef5;
+    }
+
+    form input[type="checkbox"] {
+      margin-right: 6px;
+    }
+
+    form button {
+      background: #f1f1f1;
+      color: #2a2a2a;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    form button:hover {
+      background: #cf49cd;
+    }
+
+    /* --- Chart & WordCloud Wrappers --- */
+    .chart-wrapper,
+    .wordcloud-wrapper {
+      margin-bottom: 32px;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: auto !important;
+      display: block;
+      margin: 0 auto;
+    }
+
+    #wordCloud {
+      width: 100%;
+      height: 280px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #ffffff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* --- Responsive Adjustments --- */
+    @media (max-width: 500px) {
+      form {
+        gap: 8px;
+      }
+
+      form label,
+      form button {
+        font-size: 12px;
+        padding: 6px 10px;
+      }
+
+      #wordCloud {
+        height: 220px;
+      }
+    }
+
+    .last-update {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 0.9em;
+      color: #666;
+    }
+
+    .refresh-btn {
+      margin-left: 10px;
+      padding: 4px 8px;
+      background: #e5e7eb;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .refresh-btn:hover {
+      background: #d1d5db;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Analisis Artikel Kesehatan – Speech Delay</h1>
+    <div class="last-update">
+      Terakhir diperbarui: <span id="lastUpdateTime">{{ last_update }}</span>
+      <button onclick="refreshData()" class="refresh-btn">
+        ⟳ Perbarui Manual
+      </button>
+    </div>
+
+    <form method="get" action="/dashboard">
+      <label>
+        <input type="checkbox" name="source" value="Haibunda" {% if 'Haibunda' in selected_sources %}checked{% endif %}>
+        Haibunda
+      </label>
+      <label>
+        <input type="checkbox" name="source" value="Wikipedia" {% if 'Wikipedia' in selected_sources %}checked{% endif
+          %}> Wikipedia
+      </label>
+      <label>
+        <input type="checkbox" name="source" value="Hellosehat" {% if 'Hellosehat' in selected_sources %}checked{% endif
+          %}> Hellosehat
+      </label>
+      <button type="submit">Terapkan</button>
+    </form>
+
+    <div class="chart-wrapper">
+      <h2>Top Keywords</h2>
+      <canvas id="keywordChart"></canvas>
+    </div>
+
+    <div class="wordcloud-wrapper">
+      <h2>Word Cloud</h2>
+      <div id="wordCloud"></div>
+    </div>
+
+    <div class="chart-wrapper">
+      <h2>Jumlah Artikel per Sumber</h2>
+      <canvas id="articleChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    function refreshData() {
+      fetch('/scrape')
+        .then(response => location.reload())
+    }
+
+    // Update waktu secara real-time
+    document.addEventListener("DOMContentLoaded", function () {
+      const rawDate = "{{ last_update|safe }}";
+      const lastUpdate = new Date(rawDate);
+
+      const formatted =
+        lastUpdate.toLocaleDateString('id-ID', {
+          year: 'numeric', month: 'long', day: 'numeric'
+        }) +
+        ' ' +
+        lastUpdate.toLocaleTimeString('id-ID', {
+          hour: '2-digit', minute: '2-digit'
+        });
+
+      document.getElementById('lastUpdateTime').textContent = formatted;
+    });
+
+    // 1) Bar Chart Top Keywords
+    new Chart(
+      document.getElementById('keywordChart').getContext('2d'),
+      {
+        type: 'bar',
+        data: {
+          labels: {{ keywords.keys() | list | tojson | safe }},
+      datasets: [{
+        label: 'Frekuensi',
+        data: {{ keywords.values() | list | tojson | safe }},
+      backgroundColor: 'rgba(236, 97, 169, 0.8)'
+        }]
+      },
+      options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
+    }
+    );
+
+    // 2) Word Cloud
+    const wcList = {{ wordcloud_data| tojson | safe }};
+
+    // Hitung frekuensi maksimum untuk normalisasi
+    const maxFreq = Math.max(...wcList.map(item => item[1]));
+
+    WordCloud(document.getElementById('wordCloud'), {
+      list: wcList,
+      gridSize: 8,
+      weightFactor: (size) => {
+        // Atur ukuran font antara 15px sampai 60px
+        return (size / maxFreq) * 60 + 22;
+      },
+      fontFamily: 'Inter, sans-serif',
+      color: (word, freq) => {
+        const opacity = 0.3 + (freq / maxFreq) * 0.7;
+        return `rgba(232, 107, 171, ${opacity})`;
+      },
+      fontWeight: (word, freq) => {
+        // Hitung ketebalan font (300 - 900)
+        return 300 + Math.round((freq / maxFreq) * 600);
+      },
+      rotateRatio: 0,
+      rotationSteps: 1,
+      backgroundColor: '#ffffff',
+      minSize: 8,
+      padding: 2
+    });
+
+    // 3) Doughnut Chart Jumlah Artikel per Sumber
+    new Chart(
+      document.getElementById('articleChart').getContext('2d'),
+      {
+        type: 'doughnut',
+        data: {
+          labels: {{ article_counts.keys() | list | tojson | safe }},
+      datasets: [{
+        data: {{ article_counts.values() | list | tojson | safe }},
+      backgroundColor: [
+        'rgba(255, 99, 132, 0.7)',
+        'rgba(255, 206, 86, 0.7)',
+        'rgba(75, 192, 192, 0.7)'
+      ],
+      borderColor: '#fff',
+      borderWidth: 2
+        }]
+      },
+      options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } }
+    }
+    }
+    );
+  </script>
+</body>
+
+</html>
