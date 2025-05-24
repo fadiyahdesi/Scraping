@@ -12,7 +12,7 @@ import json
 load_dotenv()
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
-MONGO_URI = os.getenv("MONGO_URI")
+# MONGO_URI = os.getenv("MONGO_URI")
 
 client = MongoClient(os.getenv("ATLAS_MONGO_URI"))
 db = client["fafa"]
