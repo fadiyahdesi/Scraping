@@ -11,10 +11,16 @@ import json
 
 load_dotenv()
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
-# MONGO_URI = os.getenv("MONGO_URI")
 
-client = MongoClient(os.getenv("ATLAS_MONGO_URI"))
+# Mount static directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Jinja templates
+templates = Jinja2Templates(directory="templates")
+
+# Mongo connection
+MONGO_URI = os.getenv("ATLAS_MONGO_URI", "mongodb://localhost:27017")
+client = MongoClient(MONGO_URI)
 db = client["fafa"]
 collection = db["scraping"]
 
@@ -39,14 +45,9 @@ def dashboard(request: Request, source: list[str] = Query(default=['Haibunda', '
         all_keywords.extend(filtered)
 
     keyword_counts = dict(Counter(all_keywords).most_common(10))
-
-    # Wordcloud list
     wordcloud_data = [[k, v] for k, v in keyword_counts.items()]
-
-    # Article counts
     article_counts = dict(Counter([a.get("source", "Unknown") for a in articles]))
 
-    # ⏱ Ambil waktu paling akhir dari ObjectId (buat last_update)
     last_update = max([a["_id"].generation_time for a in articles]).isoformat() if articles else datetime.now().isoformat()
 
     return templates.TemplateResponse("dashboard.html", {
